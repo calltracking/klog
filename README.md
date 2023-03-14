@@ -10,6 +10,7 @@ Kamailio.BYE
 Kamailio.ERROR
 ```
 
+<img width="1403" alt="sample-dd-metrics" src="https://user-images.githubusercontent.com/1568/224875137-e3cc7631-61af-4f7c-be08-1181e2ee7da0.png">
 
 # Install
 
