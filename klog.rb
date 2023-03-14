@@ -3,6 +3,8 @@ require 'set'
 require 'time'
 require 'datadog/statsd'
 
+verbose = (ARGV[1] == '-v')
+
 KLogStats = Datadog::Statsd.new('127.0.0.1', 8125)
 
 PROC_NAME='kamailio'
@@ -21,7 +23,7 @@ flush_byes    = Set.new
 current_time = Time.now
 current_year = current_time.year
 offset_time = File.read("/var/log/klog.time").to_i rescue 0
-puts "offset_time: #{offset_time.inspect}"
+puts "offset_time: #{offset_time.inspect}" if verbose
 progress = 0
 ts = nil
 IO.foreach("/var/log/messages").each do |line|
@@ -33,14 +35,18 @@ IO.foreach("/var/log/messages").each do |line|
       ts = Time.parse("#{time_parts[0]} #{time_parts[1]} #{current_year} #{time_parts[2]}").to_i
       # ignore lines if they are before our last log time this allows us to run in a cron once per minute to collect and in batches
       if ts < offset_time
-        if (progress % 1000) == 0
-          printf("INVITES: ..., ACKS: ..., BYES: ..., ERRORS: ...,   SEEKING: %d lines\t\t\r", progress)
+        if verbose
+          if (progress % 1000) == 0
+            printf("INVITES: ..., ACKS: ..., BYES: ..., ERRORS: ...,   SEEKING: %d lines\t\t\r", progress)
+          end
         end
         progress+=1
         next
       else
         if (progress % 1000) == 0
-          printf("INVITES: #{invites.size}, ACKS: #{acks.size}, BYES: #{byes.size}, ERRORS: #{errors.size}, processed: %d lines\t\t\r", progress)
+          if verbose
+            printf("INVITES: #{invites.size}, ACKS: #{acks.size}, BYES: #{byes.size}, ERRORS: #{errors.size}, processed: %d lines\t\t\r", progress)
+          end
           invites.each {|id|
             next if flush_invites.include?(id)
             flush_invites << id
