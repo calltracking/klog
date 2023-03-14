@@ -3,7 +3,7 @@ require 'set'
 require 'time'
 require 'datadog/statsd'
 
-verbose = (ARGV[1] == '-v')
+verbose = (ARGV[0] == '-v')
 
 KLogStats = Datadog::Statsd.new('127.0.0.1', 8125)
 

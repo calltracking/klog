@@ -16,6 +16,14 @@ Kamailio.ERROR
 
 copy klog.rb to /usr/local/bin
 install ruby (tested on 3.x)
+```
+gem install dogstatsd-ruby
+```
+
+first time run interactive mode so you can see what it's doing:
+```
+ruby /usr/local/bin/klog.rb -v
+```
 
 every 5 minutes
 ```
