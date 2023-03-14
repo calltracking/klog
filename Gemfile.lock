@@ -1,0 +1,13 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    dogstatsd-ruby (5.5.0)
+
+PLATFORMS
+  arm64-darwin-22
+
+DEPENDENCIES
+  dogstatsd-ruby
+
+BUNDLED WITH
+   2.4.6

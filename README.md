@@ -3,10 +3,12 @@
 Assuming your Kamailio server logs to syslog e.g. /var/log/messages this will (not efficiently) (but hopefully effectively)
 report the following metrics for your datadlog or other statsd like services:
 
+```
 Kamailio.ACK
 Kamailio.INVITE
 Kamailio.BYE
 Kamailio.ERROR
+```
 
 
 # Install
