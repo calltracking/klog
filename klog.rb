@@ -43,9 +43,9 @@ counts.each {|count|
   else
     puts "increment: Kamailio.#{key} by #{value}"
     KLogStats.increment("Kamailio.#{key}", by: value)
-    KLogStats.flush
   end
 }
 ensure
+  KLogStats.flush
   FileUtils.rm(pidfile_path, force: true)
 end
