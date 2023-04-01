@@ -113,15 +113,16 @@ int main(int argc, char **argv) {
 
     Stats stats;
     if (process_log_file(log_filename, offset_time, stats, !!argv[1])) {
+	printf("\nfinal offset: %d\n", offset_time);
 
         std::cout << "INVITES: " << stats.invites << ", ACKS: " << stats.acks
                   << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << std::endl;
-        /*{
+        {
             std::ofstream offset_file(offset_filename);
             if (offset_file) {
                 offset_file << std::time(nullptr);
             }
-        }*/
+        }
 
         return 0;
     } else {
