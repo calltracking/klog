@@ -1,3 +1,8 @@
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -30,13 +35,30 @@ std::tm parse_date(const std::string& date_str) {
     return tm;
 }
 
-bool process_log_file(const std::string& filename, time_t &offset_time, Stats& stats, const bool progress=false) {
-    std::ifstream log_file(filename);
-    if (!log_file.is_open()) {
-        std::cerr << "Error: Unable to access file '" << filename << "'. Check your permissions." << std::endl;
-        return false;
+bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& stats, const bool progress=false) {
+
+    int fd = open(log_path.c_str(), O_RDONLY);
+    if (fd == -1) {
+        perror("Error opening file");
+        return 1;
     }
-    std::string line;
+
+    struct stat sb;
+    if (fstat(fd, &sb) == -1) {
+        perror("Error getting file size");
+        close(fd);
+        return 1;
+    }
+
+    char* addr = static_cast<char*>(mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0));
+    if (addr == MAP_FAILED) {
+        perror("Error mmap-ing file");
+        close(fd);
+        return 1;
+    }
+
+    size_t pos = 0;
+    size_t file_size = static_cast<size_t>(sb.st_size);
 
     std::regex matcher(R"(\/usr\/local\/sbin\/kamailio\[\d+\]: (INFO|ERROR|NOTICE): (\{(.*)\}|<core>))");
     std::regex error_match(R"(\{(\d+)\s(\d+)\s(ERROR)\s(.*)\})");
@@ -50,7 +72,14 @@ bool process_log_file(const std::string& filename, time_t &offset_time, Stats& s
     std::tm now_tm = *std::localtime(&now_time_t);
     size_t error_count = 0;
 
-    while (std::getline(log_file, line)) {
+    while (pos < file_size) {
+        size_t end_pos = pos;
+        while (end_pos < static_cast<size_t>(sb.st_size) && addr[end_pos] != '\n') {
+            ++end_pos;
+        }
+        std::string line(addr + pos, addr + end_pos);
+	pos = end_pos + 1;
+
         if (std::regex_search(line, match_results, matcher)) {
             std::string level = match_results[1];
             std::string log = match_results[2];
@@ -63,8 +92,9 @@ bool process_log_file(const std::string& filename, time_t &offset_time, Stats& s
             time_t ts = mktime(&tm);
 
             if (ts < offset_time) {
-                fprintf(stderr, "seeking: %ld < %ld\r", ts, offset_time);
-                return false;
+                fprintf(stderr, "seeking: '%ld' < '%ld'\r", ts, offset_time);
+		fflush(stderr);
+                continue;
             }
 	    if (progress) {
                 fprintf(stderr, "INVITES: %ld, ACKS: %ld, BYES: %ld, ERRORS: %ld\r", invites.size(), acks.size(), byes.size(), errors.size() + error_count);
@@ -91,6 +121,9 @@ bool process_log_file(const std::string& filename, time_t &offset_time, Stats& s
         }
     }
 
+    munmap(addr, sb.st_size);
+    close(fd);
+
     stats.invites = invites.size();
     stats.acks = acks.size();
     stats.byes = byes.size();
@@ -112,8 +145,13 @@ int main(int argc, char **argv) {
     printf("starting offset: %ld\n", offset_time);
 
     Stats stats;
-    if (process_log_file(log_filename, offset_time, stats, !!argv[1])) {
+    bool progress = !!argv[1];
+    if (process_log_file(log_filename, offset_time, stats, progress)) {
+	if (progress) {
+            fprintf(stderr, "\n\n");
+	}
 	printf("\nfinal offset: %ld\n", offset_time);
+
 
         std::cout << "INVITES: " << stats.invites << ", ACKS: " << stats.acks
                   << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << std::endl;
