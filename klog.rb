@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 # scan kamailio logs and report to statsd total number of invites and errors
 require 'set'
 require 'time'
@@ -8,9 +10,10 @@ if is_running.size > 1
   parts = is_running.first.split(/\s/).reject{|p| p == '' }
   parts.shift
   pid = parts.first.to_i
-  puts "checked pid: #{Process.pid} != #{pid}"
-  if Process.pid != pid
-    puts "locked and running: #{parts.inspect}"
+  ppid = parts[1].to_i
+  if Process.pid != pid && Process.pid != ppid
+    puts "checked pid: #{Process.pid} != #{pid}"
+    puts "locked and running: #{parts.inspect}\n#{is_running.inspect}"
     return
   end
 end
