@@ -20,15 +20,19 @@ install ruby (tested on 3.x)
 gem install dogstatsd-ruby
 ```
 
-first time run interactive mode so you can see what it's doing:
+you will need a c++ compatible compiler
 ```
-ruby /usr/local/bin/klog.rb -v
+make
 ```
 
-every 5 minutes
+```
+make install
+```
+
+every 1 minutes
 ```
 crontab -e
-*/5 * * * * /usr/local/bin/ruby /usr/local/bin/klog.rb
+* * * * * /usr/local/bin/ruby /usr/local/bin/klog.rb
 ```
 
 It keeps track of the last log entry processed by time stamp by writing to 
