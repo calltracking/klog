@@ -19,6 +19,7 @@ struct Stats {
     size_t acks = 0;
     size_t byes = 0;
     size_t errors = 0;
+    size_t cancels = 0;
     size_t lines = 0;
 };
 
@@ -76,7 +77,7 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
     std::regex log_match(R"(\{(\d+)\s(\d+)\s(\w+)\s(.*)\})");
 
     std::smatch match_results;
-    std::unordered_set<std::string> invites, acks, byes, errors;
+    std::unordered_set<std::string> invites, acks, byes, errors, cancels;
 
     auto now = std::chrono::system_clock::now();
     auto now_time_t = std::chrono::system_clock::to_time_t(now);
@@ -108,7 +109,7 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
                 continue;
             }
 	    if (progress) {
-                fprintf(stderr, "INVITES: %ld, ACKS: %ld, BYES: %ld, ERRORS: %ld\r", invites.size(), acks.size(), byes.size(), errors.size() + error_count);
+                fprintf(stderr, "INVITES: %ld, ACKS: %ld, BYES: %ld, CANCELS: %ld, ERRORS: %ld\r", invites.size(), acks.size(), byes.size(), cancels.size(), errors.size() + error_count);
 	    }
 
 	    if (level == "ERROR") {
@@ -126,6 +127,8 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
                     byes.insert(call_id);
                 } else if (status == "ERROR") {
                     errors.insert(call_id);
+                } else if (status == "CANCEL") {
+                    cancels.insert(call_id);
                 }
             }
             offset_time = ts;
@@ -139,6 +142,7 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
     stats.acks = acks.size();
     stats.byes = byes.size();
     stats.errors = errors.size() + error_count;
+    stats.cancels = cancels.size();
     stats.lines = line_count;
     return true;
 }
@@ -166,7 +170,7 @@ int main(int argc, char **argv) {
 
 
         std::cout << "INVITES: " << stats.invites << ", ACKS: " << stats.acks
-                  << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << ", LINES: " << stats.lines << std::endl;
+                  << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << ", CANCELS: " << stats.cancels << ", LINES: " << stats.lines << std::endl;
         {
             std::ofstream offset_file(offset_filename);
             if (offset_file) {
