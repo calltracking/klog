@@ -126,6 +126,7 @@ int main(int argc, char **argv) {
 
         return 0;
     } else {
+	printf("\nError processing\n");
         return 1;
     }
 
