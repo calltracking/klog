@@ -4,6 +4,7 @@
 #include <regex>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <ctime>
 #include <iomanip>
 #include <chrono>
@@ -29,8 +30,12 @@ std::tm parse_date(const std::string& date_str) {
     return tm;
 }
 
-void process_log_file(const std::string& filename, time_t &offset_time, Stats& stats) {
+bool process_log_file(const std::string& filename, time_t &offset_time, Stats& stats, const bool progress=false) {
     std::ifstream log_file(filename);
+    if (!log_file.is_open()) {
+        std::cerr << "Error: Unable to access file '" << filename << "'. Check your permissions." << std::endl;
+        return false;
+    }
     std::string line;
 
     std::regex matcher(R"(\/usr\/local\/sbin\/kamailio\[\d+\]: (INFO|ERROR|NOTICE): (\{(.*)\}|<core>))");
@@ -39,8 +44,6 @@ void process_log_file(const std::string& filename, time_t &offset_time, Stats& s
 
     std::smatch match_results;
     std::unordered_set<std::string> invites, acks, byes, errors;
-
-    time_t last_ts = 0;
 
     auto now = std::chrono::system_clock::now();
     auto now_time_t = std::chrono::system_clock::to_time_t(now);
@@ -53,24 +56,22 @@ void process_log_file(const std::string& filename, time_t &offset_time, Stats& s
             std::string log = match_results[2];
 
 	    std::string date_str = line.substr(0, 15);
-	    //printf("date_str: %s\n",date_str.c_str());
             std::tm tm = parse_date(date_str);
 
             tm.tm_year = now_tm.tm_year;
 
             time_t ts = mktime(&tm);
 
-	    if (ts > last_ts) {
-		printf("seeking: %ld < %ld: '%s'\n", ts, offset_time, line.c_str());
+            if (ts < offset_time) {
+                fprintf(stderr, "seeking: %ld < %ld\r", ts, offset_time);
+                return false;
+            }
+	    if (progress) {
+                fprintf(stderr, "INVITES: %ld, ACKS: %ld, BYES: %ld, ERRORS: %ld\r", invites.size(), acks.size(), byes.size(), errors.size() + error_count);
 	    }
 
-	    last_ts = ts;
-
-            if (ts < offset_time) {
-                continue;
-            }
 	    if (level == "ERROR") {
-		printf("we matched an error: %s\n", line.c_str());
+		//fprintf(stderr, "%s\r", line.c_str());
 		error_count++;
             } else if (std::regex_search(log, match_results, log_match)) {
                 std::string status = match_results[3];
@@ -94,9 +95,10 @@ void process_log_file(const std::string& filename, time_t &offset_time, Stats& s
     stats.acks = acks.size();
     stats.byes = byes.size();
     stats.errors = errors.size() + error_count;
+    return true;
 }
 
-int main() {
+int main(int argc, char **argv) {
     std::string log_filename = "/var/log/messages";
     std::string offset_filename = "/var/log/klog.time";
 
@@ -107,19 +109,23 @@ int main() {
             offset_file >> offset_time;
         }
     }
+    printf("starting offset: %ld\n", offset_time);
 
     Stats stats;
-    process_log_file(log_filename, offset_time, stats);
+    if (process_log_file(log_filename, offset_time, stats, !!argv[1])) {
 
-    std::cout << "INVITES: " << stats.invites << ", ACKS: " << stats.acks
-              << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << std::endl;
+        std::cout << "INVITES: " << stats.invites << ", ACKS: " << stats.acks
+                  << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << std::endl;
+        /*{
+            std::ofstream offset_file(offset_filename);
+            if (offset_file) {
+                offset_file << std::time(nullptr);
+            }
+        }*/
 
-    {
-        std::ofstream offset_file(offset_filename);
-        if (offset_file) {
-            offset_file << std::time(nullptr);
-        }
+        return 0;
+    } else {
+        return 1;
     }
 
-    return 0;
 }
