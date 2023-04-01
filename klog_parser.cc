@@ -93,7 +93,6 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
 
             if (ts < offset_time) {
                 fprintf(stderr, "seeking: '%ld' < '%ld'\r", ts, offset_time);
-		fflush(stderr);
                 continue;
             }
 	    if (progress) {
