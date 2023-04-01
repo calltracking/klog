@@ -19,20 +19,31 @@ struct Stats {
     size_t acks = 0;
     size_t byes = 0;
     size_t errors = 0;
+    size_t lines = 0;
 };
 
-std::tm parse_date(const std::string& date_str) {
-    std::tm tm = {};
+void parse_date(const std::string& date_str, std::tm &tm, int year) {
     std::istringstream iss(date_str);
-    iss >> std::get_time(&tm, "%b %d %H:%M:%S");
+    std::string month_str;
 
-    if (date_str[4] == ' ') {
-        tm.tm_mday = date_str[5] - '0';
-    } else {
-        tm.tm_mday = std::stoi(date_str.substr(4, 2));
-    }
+    iss >> month_str;
+    iss >> tm.tm_mday;
+    iss.get(); // Ignore the space
+    iss >> tm.tm_hour;
+    iss.get(); // Ignore the ':'
+    iss >> tm.tm_min;
+    iss.get(); // Ignore the ':'
+    iss >> tm.tm_sec;
 
-    return tm;
+    tm.tm_year = 2023 - 1900; // Set the year to 2023
+
+    static const std::unordered_map<std::string, int> month_map = {
+        {"Jan", 0}, {"Feb", 1}, {"Mar", 2}, {"Apr", 3}, {"May", 4}, {"Jun", 5},
+        {"Jul", 6}, {"Aug", 7}, {"Sep", 8}, {"Oct", 9}, {"Nov", 10}, {"Dec", 11},
+    };
+
+    tm.tm_mon = month_map.at(month_str);
+    tm.tm_year = year;
 }
 
 bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& stats, const bool progress=false) {
@@ -71,6 +82,7 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
     auto now_time_t = std::chrono::system_clock::to_time_t(now);
     std::tm now_tm = *std::localtime(&now_time_t);
     size_t error_count = 0;
+    size_t line_count = 0;
 
     while (pos < file_size) {
         size_t end_pos = pos;
@@ -79,20 +91,20 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
         }
         std::string line(addr + pos, addr + end_pos);
 	pos = end_pos + 1;
+	++line_count;
 
         if (std::regex_search(line, match_results, matcher)) {
             std::string level = match_results[1];
             std::string log = match_results[2];
 
 	    std::string date_str = line.substr(0, 15);
-            std::tm tm = parse_date(date_str);
-
-            tm.tm_year = now_tm.tm_year;
+            std::tm tm = {};
+	    parse_date(date_str, tm, now_tm.tm_year);
 
             time_t ts = mktime(&tm);
 
             if (ts < offset_time) {
-                fprintf(stderr, "seeking: '%ld' < '%ld'\r", ts, offset_time);
+                fprintf(stderr, "seeking[%ld]: '%ld' < '%ld'\r", line_count, ts, offset_time);
                 continue;
             }
 	    if (progress) {
@@ -127,6 +139,7 @@ bool process_log_file(const std::string& log_path, time_t &offset_time, Stats& s
     stats.acks = acks.size();
     stats.byes = byes.size();
     stats.errors = errors.size() + error_count;
+    stats.lines = line_count;
     return true;
 }
 
@@ -153,7 +166,7 @@ int main(int argc, char **argv) {
 
 
         std::cout << "INVITES: " << stats.invites << ", ACKS: " << stats.acks
-                  << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << std::endl;
+                  << ", BYES: " << stats.byes << ", ERRORS: " << stats.errors << ", LINES: " << stats.lines << std::endl;
         {
             std::ofstream offset_file(offset_filename);
             if (offset_file) {
